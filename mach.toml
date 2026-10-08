@@ -34,6 +34,7 @@ abi = "aapcs64"
 [artifact.deflate]
 kind = "static"
 default = true
+export = true
 entry = "lib/deflate.mach"
 out = "{project.work}/lib/deflate"
 targets = ["*"]
