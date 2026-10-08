@@ -3,3 +3,11 @@
 
 # the startup a test dispatcher of this library links
 use std.runtime;
+
+fwd deflate.adler32;
+fwd deflate.crc32;
+fwd deflate.format;
+fwd deflate.inflate;
+fwd deflate.deflate;
+fwd deflate.zlib;
+fwd deflate.gzip;
