@@ -14,7 +14,7 @@ Add the dependency to `mach.toml`:
 ```toml
 [dep.deflate]
 git = "https://github.com/briar-systems/mach-deflate"
-version = "^0.1"
+ref = "branch/dev"
 ```
 
 Then bind the library in a source file:
