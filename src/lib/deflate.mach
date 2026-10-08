@@ -9,3 +9,5 @@ fwd deflate.crc32;
 fwd deflate.format;
 fwd deflate.inflate;
 fwd deflate.deflate;
+fwd deflate.zlib;
+fwd deflate.gzip;
