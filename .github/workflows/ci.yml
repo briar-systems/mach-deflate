@@ -1,10 +1,11 @@
 name: CI
 
-# every pull request builds and tests on linux. a dispatch can name other
+# every pull request and merge group builds and tests on linux. a dispatch can name other
 # runners to test a change on windows or darwin before it merges.
 
 on:
   pull_request:
+  merge_group:
   workflow_dispatch:
     inputs:
       runners:
