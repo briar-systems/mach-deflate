@@ -26,10 +26,9 @@
 # persist because they are the encoder's state (closed until init, finished
 # after finish until reset).
 #
-# zlib and gzip framing use the checksums the decoders verify, adler32 and
-# crc32 from deflate.adler32 and deflate.crc32. the gzip header carries no
-# name, an mtime of 0 and OS 255 (unknown), so it does not vary by host or
-# clock.
+# zlib and gzip framing use the checksums the decoders verify, deflate.adler32
+# and deflate.crc32. the gzip header carries no name, an mtime of 0 and OS 255
+# (unknown), so it does not vary by host or clock.
 
 use std.system.capability;
 use std.types.bool.bool;
