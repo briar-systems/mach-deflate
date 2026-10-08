@@ -1,0 +1,5 @@
+# the deflate library, what a dependent's `use deflate;` binds
+# DEFLATE compression and decompression (RFC 1951), the zlib (RFC 1950) and gzip (RFC 1952) framings, and the adler32 and crc32 checksums.
+
+# the startup a test dispatcher of this library links
+use std.runtime;
