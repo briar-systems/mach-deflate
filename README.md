@@ -23,6 +23,16 @@ Then bind the library in a source file:
 use deflate;
 ```
 
+The library forwards these modules:
+
+- `deflate.deflate`: DEFLATE compression (RFC 1951)
+- `deflate.inflate`: DEFLATE decompression (RFC 1951)
+- `deflate.zlib`: the zlib framing (RFC 1950)
+- `deflate.gzip`: the gzip framing (RFC 1952)
+- `deflate.format`: the DEFLATE tables shared by compression and decompression
+- `deflate.adler32`: the Adler-32 checksum
+- `deflate.crc32`: the CRC-32 checksum
+
 
 ## Contributing
 
