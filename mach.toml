@@ -1,9 +1,9 @@
 [project]
 id = "deflate"
 version = "0.1.0"
-mach = "^6.10"
+mach = "^6"
 src = "src"
-out = "out/{target.name}/{profile.name}"
+work = "out/{target.name}/{profile.name}"
 
 [target.linux-x86_64]
 isa = "x86_64"
@@ -35,7 +35,7 @@ abi = "aapcs64"
 kind = "static"
 default = true
 entry = "lib/deflate.mach"
-out = "lib/deflate"
+out = "{project.work}/lib/deflate"
 targets = ["*"]
 link = ["kernel32"]
 need = []
@@ -50,19 +50,15 @@ export = false
 
 [profile.debug]
 default = true
-opt = 0
+optimize = false
 debug = true
 simd = "scalarize"
-vectorize = false
-float_reassoc = false
 
 [profile.release]
-opt = 2
+optimize = true
 debug = false
 simd = "scalarize"
-vectorize = true
-float_reassoc = false
 
 [dep.std]
 git = "https://github.com/briar-systems/mach-std"
-version = "^9.5"
+ref = "branch/dev"
