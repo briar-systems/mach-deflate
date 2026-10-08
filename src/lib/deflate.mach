@@ -6,3 +6,6 @@ use std.runtime;
 
 fwd deflate.adler32;
 fwd deflate.crc32;
+fwd deflate.format;
+fwd deflate.inflate;
+fwd deflate.deflate;
