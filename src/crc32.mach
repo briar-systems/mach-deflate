@@ -79,7 +79,7 @@ val TABLE: [256]u32 = [256]u32{
 # seed value for an incremental checksum
 # ---
 # ret: the initial running state
-pub fun init() u32 {
+pub fun make() u32 {
     ret 0xFFFFFFFF;
 }
 
@@ -115,7 +115,7 @@ pub fun final(crc: u32) u32 {
 # len:  number of bytes
 # ret:  the checksum value
 pub fun hash(data: *u8, len: usize) u32 {
-    ret final(update(init(), data, len));
+    ret final(update(make(), data, len));
 }
 
 test crc32__known_vectors {
@@ -125,7 +125,7 @@ test crc32__known_vectors {
     if (hash(a::*u8, 1) != 0xE8B7BE43) { ret 2; }
     val s: str = "123456789";
     if (hash(s::*u8, 9) != 0xCBF43926) { ret 3; }
-    var c: u32 = init();
+    var c: u32 = make();
     c = update(c, s::*u8, 4);
     c = update(c, ?s[4], 5);
     if (final(c) != 0xCBF43926) { ret 4; }

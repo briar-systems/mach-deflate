@@ -1695,7 +1695,7 @@ $if (capability.HOSTED) {
         var ordinal: usize = 1;
         for (ordinal <= 8) {
             var tracker:  testing.Testing;
-            val err_made: err[A.Error] = testing.make(?tracker);
+            val err_made: err[A.Error] = testing.init(?tracker);
             if (sel err_made.err) { ret 1; }
             testing.fail_at_ordinal(?tracker, ordinal);
             val res_decompress_alloc: res[V.Vector[u8], InflateError] = decompress_alloc(testing.allocator_of(?tracker), ?C_DYNAMIC[0], 402);

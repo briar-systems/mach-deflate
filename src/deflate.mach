@@ -1008,8 +1008,8 @@ pub fun reset(z: *Deflater) {
     z.phase       = P_BODY;
     z.total       = 0;
     z.check       = 0;
-    if (z.container == ZLIB) { z.check = adler32.init(); }
-    if (z.container == GZIP) { z.check = crc32.init(); }
+    if (z.container == ZLIB) { z.check = adler32.make(); }
+    if (z.container == GZIP) { z.check = crc32.make(); }
 
     header(z);
 }
@@ -1523,7 +1523,7 @@ $if (capability.HOSTED) {
         var ordinal: usize = 1;
         for (ordinal <= 16) {
             var tracker:  testing.Testing;
-            val err_made: err[A.Error] = testing.make(?tracker);
+            val err_made: err[A.Error] = testing.init(?tracker);
             if (sel err_made.err) { ret 1; }
             testing.fail_at_ordinal(?tracker, ordinal);
             val res_compress_alloc: res[V.Vector[u8], DeflateError] = compress_alloc(testing.allocator_of(?tracker), 6, RAW, ?corpus[0], 50000);

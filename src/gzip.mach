@@ -148,8 +148,8 @@ fun member_reset(z: *Decompressor) {
     z.have  = 0;
     z.skip  = 0;
     z.flg   = 0;
-    z.hcrc  = crc32.init();
-    z.crc   = crc32.init();
+    z.hcrc  = crc32.make();
+    z.crc   = crc32.make();
     z.isize = 0;
 }
 
@@ -788,7 +788,7 @@ $if (capability.HOSTED) {
     };
 
     #[testing]
-    fun t_copy(dst: *u8, src: *u8, count: usize) {
+    fun copy(dst: *u8, src: *u8, count: usize) {
         var i: usize = 0;
         for (i < count) {
             dst[i] = src[i];
@@ -797,7 +797,7 @@ $if (capability.HOSTED) {
     }
 
     #[testing]
-    fun t_split(comp: *u8, count: usize, split: usize, room: usize, expected: *u8, expected_len: usize) i32 {
+    fun split_feed(comp: *u8, count: usize, split: usize, room: usize, expected: *u8, expected_len: usize) i32 {
         var a: A.Allocator;
         page.make(?a);
         val res_created: res[Decompressor, I.InflateError] = init(?a);
@@ -836,19 +836,19 @@ $if (capability.HOSTED) {
 
     test gzip__all_member_split_points_preserve_output_and_independent_framing {
         var comp: [242]u8;
-        t_copy(?comp[0], ?C_G_PY6[0], 71);
-        t_copy(?comp[71], ?C_G_EMPTY[0], 20);
-        t_copy(?comp[91], ?C_G_CLI[0], 95);
-        t_copy(?comp[186], ?N_G_GOOD_HCRC[0], 56);
+        copy(?comp[0], ?C_G_PY6[0], 71);
+        copy(?comp[71], ?C_G_EMPTY[0], 20);
+        copy(?comp[91], ?C_G_CLI[0], 95);
+        copy(?comp[186], ?N_G_GOOD_HCRC[0], 56);
         var expected: [152]u8;
-        t_copy(?expected[0], ?D_G_PY6[0], 51);
-        t_copy(?expected[51], ?D_G_CLI[0], 67);
-        t_copy(?expected[118], ?D_GOOD_HCRC[0], 34);
+        copy(?expected[0], ?D_G_PY6[0], 51);
+        copy(?expected[51], ?D_G_CLI[0], 67);
+        copy(?expected[118], ?D_GOOD_HCRC[0], 34);
         var split: usize = 0;
         for (split <= 242) {
-            if (t_split(?comp[0], 242, split, 1, ?expected[0], 152) != 0)    { ret 1; }
-            if (t_split(?comp[0], 242, split, 17, ?expected[0], 152) != 0)   { ret 2; }
-            if (t_split(?comp[0], 242, split, 4096, ?expected[0], 152) != 0) { ret 3; }
+            if (split_feed(?comp[0], 242, split, 1, ?expected[0], 152) != 0)    { ret 1; }
+            if (split_feed(?comp[0], 242, split, 17, ?expected[0], 152) != 0)   { ret 2; }
+            if (split_feed(?comp[0], 242, split, 4096, ?expected[0], 152) != 0) { ret 3; }
             split = split + 1;
         }
         ret check(?comp[0], 242, ?expected[0], 152);
@@ -856,18 +856,18 @@ $if (capability.HOSTED) {
 
     test gzip__later_corruption_truncation_and_trailing_junk_never_return_prefix_success {
         var comp: [127]u8;
-        t_copy(?comp[0], ?C_G_PY6[0], 71);
-        t_copy(?comp[71], ?N_G_BAD_CRC[0], 54);
+        copy(?comp[0], ?C_G_PY6[0], 71);
+        copy(?comp[71], ?N_G_BAD_CRC[0], 54);
         if (rejects(?comp[0], 125, I.Defect.checksum{}) != 0) { ret 1; }
-        t_copy(?comp[71], ?N_G_BAD_ISIZE[0], 54);
+        copy(?comp[71], ?N_G_BAD_ISIZE[0], 54);
         if (rejects(?comp[0], 125, I.Defect.length{}) != 0) { ret 2; }
-        t_copy(?comp[71], ?N_G_BAD_MAGIC[0], 54);
+        copy(?comp[71], ?N_G_BAD_MAGIC[0], 54);
         if (rejects(?comp[0], 125, I.Defect.magic{}) != 0) { ret 3; }
-        t_copy(?comp[71], ?N_G_RESERVED_FLAG[0], 54);
+        copy(?comp[71], ?N_G_RESERVED_FLAG[0], 54);
         if (rejects(?comp[0], 125, I.Defect.flags{}) != 0) { ret 4; }
-        t_copy(?comp[71], ?N_G_BAD_HCRC[0], 56);
+        copy(?comp[71], ?N_G_BAD_HCRC[0], 56);
         if (rejects(?comp[0], 127, I.Defect.header_checksum{}) != 0) { ret 5; }
-        t_copy(?comp[71], ?N_G_GOOD_HCRC[0], 56);
+        copy(?comp[71], ?N_G_GOOD_HCRC[0], 56);
         var cut: usize = 72;
         for (cut < 127) {
             if (rejects_truncated(?comp[0], cut) != 0) { ret 6; }
@@ -926,8 +926,8 @@ $if (capability.HOSTED) {
         var a: A.Allocator;
         page.make(?a);
         var empty: [40]u8;
-        t_copy(?empty[0], ?C_G_EMPTY[0], 20);
-        t_copy(?empty[20], ?C_G_EMPTY[0], 20);
+        copy(?empty[0], ?C_G_EMPTY[0], 20);
+        copy(?empty[20], ?C_G_EMPTY[0], 20);
         val res_nothing: res[usize, I.InflateError] = decompress_into(?a, ?empty[0], 40, nil, 0);
         if (sel res_nothing.err) { ret 1; }
         if (res_nothing.ok != 0) { ret 1; }
@@ -1037,12 +1037,12 @@ $if (capability.HOSTED) {
 
     test gzip__allocation_refusal_frees_the_window_and_cumulative_output {
         var comp: [1054]u8;
-        t_copy(?comp[0], ?C_G_LARGE[0], 527);
-        t_copy(?comp[527], ?C_G_LARGE[0], 527);
+        copy(?comp[0], ?C_G_LARGE[0], 527);
+        copy(?comp[527], ?C_G_LARGE[0], 527);
         var ordinal: usize = 1;
         for (ordinal <= 32) {
             var tracker:  T.Testing;
-            val err_made: err[A.Error] = T.make(?tracker);
+            val err_made: err[A.Error] = T.init(?tracker);
             if (sel err_made.err) { ret 1; }
             T.fail_at_ordinal(?tracker, ordinal);
             val res_decompress_alloc: res[V.Vector[u8], I.InflateError] = decompress_alloc(T.allocator_of(?tracker), ?comp[0], 1054);
@@ -1081,8 +1081,8 @@ $if (capability.HOSTED) {
     # settled commits nothing
     test gzip__a_failure_after_progress_carries_the_committed_counts_across_members {
         var comp: [125]u8;
-        t_copy(?comp[0], ?C_G_PY6[0], 71);
-        t_copy(?comp[71], ?N_G_BAD_CRC[0], 54);
+        copy(?comp[0], ?C_G_PY6[0], 71);
+        copy(?comp[71], ?N_G_BAD_CRC[0], 54);
         var a: A.Allocator;
         page.make(?a);
 
@@ -1148,8 +1148,8 @@ $if (capability.HOSTED) {
 
         reset(?z);
         var comp: [125]u8;
-        t_copy(?comp[0], ?C_G_PY6[0], 71);
-        t_copy(?comp[71], ?N_G_BAD_CRC[0], 54);
+        copy(?comp[0], ?C_G_PY6[0], 71);
+        copy(?comp[71], ?N_G_BAD_CRC[0], 54);
         val res_broken: res[I.Progress, I.InflateError] = decompress(?z, ?comp[0], 125, ?obuf[0], 4096);
         if (!sel res_broken.err)                                                                { ret 10; }
         if (!sel res_broken.err.malformed)                                                      { ret 10; }
@@ -1183,10 +1183,10 @@ $if (capability.HOSTED) {
     # consumed and the prefix output counted
     test gzip__a_failed_later_member_releases_allocated_prefix_output {
         var bad: [581]u8;
-        t_copy(?bad[0], ?C_G_LARGE[0], 527);
-        t_copy(?bad[527], ?N_G_BAD_CRC[0], 54);
+        copy(?bad[0], ?C_G_LARGE[0], 527);
+        copy(?bad[527], ?N_G_BAD_CRC[0], 54);
         var bad_tracker:  T.Testing;
-        val err_bad_made: err[A.Error] = T.make(?bad_tracker);
+        val err_bad_made: err[A.Error] = T.init(?bad_tracker);
         if (sel err_bad_made.err) { ret 1; }
         fin { T.dnit(?bad_tracker); }
         val res_malformed: res[V.Vector[u8], I.InflateError] = decompress_alloc(T.allocator_of(?bad_tracker), ?bad[0], 581);
@@ -1200,10 +1200,10 @@ $if (capability.HOSTED) {
         if (T.live_count(?bad_tracker) != 0 || T.double_free_count(?bad_tracker) != 0)           { ret 9; }
 
         var comp: [827]u8;
-        t_copy(?comp[0], ?C_G_LARGE[0], 527);
-        t_copy(?comp[527], ?C_G_LARGE[0], 300);
+        copy(?comp[0], ?C_G_LARGE[0], 527);
+        copy(?comp[527], ?C_G_LARGE[0], 300);
         var tracker:  T.Testing;
-        val err_made: err[A.Error] = T.make(?tracker);
+        val err_made: err[A.Error] = T.init(?tracker);
         if (sel err_made.err) { ret 1; }
         fin { T.dnit(?tracker); }
         val res_decompress_alloc: res[V.Vector[u8], I.InflateError] = decompress_alloc(T.allocator_of(?tracker), ?comp[0], 827);
@@ -1220,6 +1220,7 @@ $if (capability.HOSTED) {
     }
 
     # an allocator that can be told to refuse releases, over the page allocator
+    #[testing]
     rec Refusing {
         backing: A.Allocator;
         refuse:  bool;
@@ -1263,7 +1264,7 @@ $if (capability.HOSTED) {
     # and stays usable until a release is accepted; a released decoder is closed
     test gzip__init_and_dnit_under_a_refusing_allocator {
         var tracker:  T.Testing;
-        val err_made: err[A.Error] = T.make(?tracker);
+        val err_made: err[A.Error] = T.init(?tracker);
         if (sel err_made.err) { ret 1; }
         T.fail_at_ordinal(?tracker, 1);
         val res_refused: res[Decompressor, I.InflateError] = init(T.allocator_of(?tracker));
