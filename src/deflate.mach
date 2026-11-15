@@ -1063,12 +1063,12 @@ pub fun init(a: *A.Allocator, level: u8, container: Container) res[Deflater, Def
     if (level > MAX_LEVEL) { ret res[Deflater, DeflateError].err{DeflateError.level{}}; }
     if (container > GZIP)  { ret res[Deflater, DeflateError].err{DeflateError.container{}}; }
 
-    val mem: res[*u16, A.Error] = A.allocate[u16](a, U16S);
-    if (sel mem.err) { ret res[Deflater, DeflateError].err{DeflateError.alloc{mem.err}}; }
+    val res_mem: res[*u16, A.Error] = A.allocate[u16](a, U16S);
+    if (sel res_mem.err) { ret res[Deflater, DeflateError].err{DeflateError.alloc{res_mem.err}}; }
 
     var z: Deflater;
     z.a     = a;
-    z.mem   = mem.ok;
+    z.mem   = res_mem.ok;
     z.head  = z.mem;
     z.prev  = ?z.mem[HASH_SIZE];
     z.tdist = ?z.mem[HASH_SIZE + W];
@@ -1100,8 +1100,8 @@ pub fun init(a: *A.Allocator, level: u8, container: Container) res[Deflater, Def
 pub fun dnit(z: *Deflater) err[A.Error] {
     if (z.mem == nil) { ret err[A.Error].ok{}; }
 
-    val freed: err[A.Error] = A.deallocate[u16](z.a, z.mem, U16S);
-    if (sel freed.err) { ret freed; }
+    val err_freed: err[A.Error] = A.deallocate[u16](z.a, z.mem, U16S);
+    if (sel err_freed.err) { ret err_freed; }
     z.mem = nil;
     ret err[A.Error].ok{};
 }
@@ -1175,12 +1175,12 @@ fun drive(z: *Deflater, src: *u8, src_len: usize, dst: *u8, dst_len: usize) res[
     var out_off: usize = 0;
 
     for (!is_done(z)) {
-        var r: res[I.Progress, DeflateError];
-        if (in_off == src_len) { r = finish(z, ?dst[out_off], dst_len - out_off); }
-        or                     { r = compress(z, ?src[in_off], src_len - in_off, ?dst[out_off], dst_len - out_off); }
-        if (sel r.err)         { ret res[usize, DeflateError].err{r.err}; }
+        var res_finish: res[I.Progress, DeflateError];
+        if (in_off == src_len)  { res_finish = finish(z, ?dst[out_off], dst_len - out_off); }
+        or                      { res_finish = compress(z, ?src[in_off], src_len - in_off, ?dst[out_off], dst_len - out_off); }
+        if (sel res_finish.err) { ret res[usize, DeflateError].err{res_finish.err}; }
 
-        val p: I.Progress = r.ok;
+        val p: I.Progress = res_finish.ok;
         in_off  = in_off + p.consumed;
         out_off = out_off + p.written;
 
@@ -1206,14 +1206,14 @@ fun drive(z: *Deflater, src: *u8, src_len: usize, dst: *u8, dst_len: usize) res[
 # ret:       bytes written, or the failure; full carries the counts committed
 #            over the whole call
 pub fun compress_into(a: *A.Allocator, level: u8, container: Container, src: *u8, src_len: usize, dst: *u8, dst_len: usize) res[usize, DeflateError] {
-    val ri: res[Deflater, DeflateError] = init(a, level, container);
-    if (sel ri.err) { ret res[usize, DeflateError].err{ri.err}; }
+    val res_level_made: res[Deflater, DeflateError] = init(a, level, container);
+    if (sel res_level_made.err) { ret res[usize, DeflateError].err{res_level_made.err}; }
 
-    var z:   Deflater                 = ri.ok;
-    val out: res[usize, DeflateError] = drive(?z, src, src_len, dst, dst_len);
+    var z:       Deflater                 = res_level_made.ok;
+    val res_out: res[usize, DeflateError] = drive(?z, src, src_len, dst, dst_len);
     dnit(?z);
 
-    ret out;
+    ret res_out;
 }
 
 fun grow(z: *Deflater, out: *V.Vector[u8], src: *u8, src_len: usize) res[usize, DeflateError] {
@@ -1226,16 +1226,16 @@ fun grow(z: *Deflater, out: *V.Vector[u8], src: *u8, src_len: usize) res[usize, 
                 ret res[usize, DeflateError].err{DeflateError.alloc{A.Error.overflow{}}};
             }
             if (next < 4096) { next = 4096; }
-            val e: res[usize, A.Error] = V.ensure[u8](out, next);
-            if (sel e.err) { ret res[usize, DeflateError].err{DeflateError.alloc{e.err}}; }
+            val res_ensure: res[usize, A.Error] = V.ensure[u8](out, next);
+            if (sel res_ensure.err) { ret res[usize, DeflateError].err{DeflateError.alloc{res_ensure.err}}; }
         }
 
-        var r: res[I.Progress, DeflateError];
-        if (in_off == src_len) { r = finish(z, ?out.data[out.len], out.cap - out.len); }
-        or                     { r = compress(z, ?src[in_off], src_len - in_off, ?out.data[out.len], out.cap - out.len); }
-        if (sel r.err)         { ret res[usize, DeflateError].err{r.err}; }
+        var res_finish: res[I.Progress, DeflateError];
+        if (in_off == src_len)  { res_finish = finish(z, ?out.data[out.len], out.cap - out.len); }
+        or                      { res_finish = compress(z, ?src[in_off], src_len - in_off, ?out.data[out.len], out.cap - out.len); }
+        if (sel res_finish.err) { ret res[usize, DeflateError].err{res_finish.err}; }
 
-        val p: I.Progress = r.ok;
+        val p: I.Progress = res_finish.ok;
         in_off  = in_off + p.consumed;
         out.len = out.len + p.written;
     }
@@ -1253,18 +1253,18 @@ fun grow(z: *Deflater, out: *V.Vector[u8], src: *u8, src_len: usize) res[usize, 
 # ret:       a vector owning the compressed bytes, which the caller must dnit,
 #            or the failure; on failure the vector is already released
 pub fun compress_alloc(a: *A.Allocator, level: u8, container: Container, src: *u8, src_len: usize) res[V.Vector[u8], DeflateError] {
-    val ri: res[Deflater, DeflateError] = init(a, level, container);
-    if (sel ri.err) { ret res[V.Vector[u8], DeflateError].err{ri.err}; }
+    val res_level_made: res[Deflater, DeflateError] = init(a, level, container);
+    if (sel res_level_made.err) { ret res[V.Vector[u8], DeflateError].err{res_level_made.err}; }
 
-    var z:   Deflater     = ri.ok;
+    var z:   Deflater     = res_level_made.ok;
     var out: V.Vector[u8] = V.init[u8](a);
 
-    val grown: res[usize, DeflateError] = grow(?z, ?out, src, src_len);
+    val res_grown: res[usize, DeflateError] = grow(?z, ?out, src, src_len);
     dnit(?z);
 
-    if (sel grown.err) {
+    if (sel res_grown.err) {
         V.dnit[u8](?out);
-        ret res[V.Vector[u8], DeflateError].err{grown.err};
+        ret res[V.Vector[u8], DeflateError].err{res_grown.err};
     }
 
     ret res[V.Vector[u8], DeflateError].ok{out};
@@ -1334,12 +1334,12 @@ $if (capability.HOSTED) {
         var a: A.Allocator;
         page.make(?a);
 
-        val c: res[usize, DeflateError] = compress_into(?a, level, RAW, ?corpus[0], n, ?packed[0], bound(n, RAW));
-        if (sel c.err) { ret 1; }
+        val res_compress_into: res[usize, DeflateError] = compress_into(?a, level, RAW, ?corpus[0], n, ?packed[0], bound(n, RAW));
+        if (sel res_compress_into.err) { ret 1; }
 
-        val d: res[usize, I.InflateError] = I.decompress_into(?a, ?packed[0], c.ok, ?unpacked[0], CORPUS_LEN);
-        if (sel d.err) { ret 2; }
-        if (d.ok != n) { ret 3; }
+        val res_decompress_into: res[usize, I.InflateError] = I.decompress_into(?a, ?packed[0], res_compress_into.ok, ?unpacked[0], CORPUS_LEN);
+        if (sel res_decompress_into.err) { ret 2; }
+        if (res_decompress_into.ok != n) { ret 3; }
 
         var i: usize = 0;
         for (i < n) {
@@ -1377,9 +1377,9 @@ $if (capability.HOSTED) {
         var a: A.Allocator;
         page.make(?a);
 
-        val ri: res[Deflater, DeflateError] = init(?a, level, RAW);
-        if (sel ri.err) { ret res[usize, DeflateError].err{ri.err}; }
-        var z: Deflater = ri.ok;
+        val res_level_made: res[Deflater, DeflateError] = init(?a, level, RAW);
+        if (sel res_level_made.err) { ret res[usize, DeflateError].err{res_level_made.err}; }
+        var z: Deflater = res_level_made.ok;
 
         var in_off:  usize = 0;
         var out_off: usize = 0;
@@ -1387,19 +1387,19 @@ $if (capability.HOSTED) {
             var room: usize = out_chunk;
             if (out_off + room > 204000) { room = 204000 - out_off; }
 
-            var r: res[I.Progress, DeflateError];
-            if (in_off == n) { r = finish(?z, ?chunked[out_off], room); }
+            var res_finish: res[I.Progress, DeflateError];
+            if (in_off == n) { res_finish = finish(?z, ?chunked[out_off], room); }
             or {
                 var feed: usize = in_chunk;
                 if (in_off + feed > n) { feed = n - in_off; }
-                r = compress(?z, ?corpus[in_off], feed, ?chunked[out_off], room);
+                res_finish = compress(?z, ?corpus[in_off], feed, ?chunked[out_off], room);
             }
-            if (sel r.err) {
+            if (sel res_finish.err) {
                 dnit(?z);
-                ret res[usize, DeflateError].err{r.err};
+                ret res[usize, DeflateError].err{res_finish.err};
             }
-            in_off  = in_off + r.ok.consumed;
-            out_off = out_off + r.ok.written;
+            in_off  = in_off + res_finish.ok.consumed;
+            out_off = out_off + res_finish.ok.written;
         }
         dnit(?z);
         ret res[usize, DeflateError].ok{out_off};
@@ -1414,17 +1414,17 @@ $if (capability.HOSTED) {
         val levels: [4]u8 = [4]u8{0, 1, 6, 9};
         var li:     usize = 0;
         for (li < 4) {
-            val whole: res[usize, DeflateError] = compress_into(?a, levels[li], RAW, ?corpus[0], 150000, ?packed[0], 204000);
-            if (sel whole.err) { ret 1; }
+            val res_whole: res[usize, DeflateError] = compress_into(?a, levels[li], RAW, ?corpus[0], 150000, ?packed[0], 204000);
+            if (sel res_whole.err) { ret 1; }
 
             val pieces: [3]usize = [3]usize{1, 7, 4093};
             var pi:     usize    = 0;
             for (pi < 3) {
-                val s: res[usize, DeflateError] = stream(levels[li], 150000, pieces[pi], pieces[2 - pi]);
-                if (sel s.err)        { ret 2; }
-                if (s.ok != whole.ok) { ret 3; }
+                val res_stream: res[usize, DeflateError] = stream(levels[li], 150000, pieces[pi], pieces[2 - pi]);
+                if (sel res_stream.err)            { ret 2; }
+                if (res_stream.ok != res_whole.ok) { ret 3; }
                 var i: usize = 0;
-                for (i < s.ok) {
+                for (i < res_stream.ok) {
                     if (chunked[i] != packed[i]) { ret 4; }
                     i = i + 1;
                 }
@@ -1446,11 +1446,11 @@ $if (capability.HOSTED) {
         val sums:   [5]u32   = [5]u32{0x21FC1F6F, 0xB5284324, 0xEC3E246F, 0x7D550CC2, 0xFF61ADA7};
         var li:     usize    = 0;
         for (li < 5) {
-            val c: res[usize, DeflateError] = compress_into(?a, levels[li], RAW, ?corpus[0], CORPUS_LEN, ?packed[0], 204000);
-            if (sel c.err) { ret 1; }
-            val sum: u32 = crc32.hash(?packed[0], c.ok);
-            if (c.ok != sizes[li]) { ret 2; }
-            if (sum != sums[li])   { ret 3; }
+            val res_compress_into: res[usize, DeflateError] = compress_into(?a, levels[li], RAW, ?corpus[0], CORPUS_LEN, ?packed[0], 204000);
+            if (sel res_compress_into.err) { ret 1; }
+            val sum: u32 = crc32.hash(?packed[0], res_compress_into.ok);
+            if (res_compress_into.ok != sizes[li]) { ret 2; }
+            if (sum != sums[li])                   { ret 3; }
             li = li + 1;
         }
         ret 0;
@@ -1465,13 +1465,13 @@ $if (capability.HOSTED) {
         val levels: [3]u8 = [3]u8{0, 1, 9};
         var li:     usize = 0;
         for (li < 3) {
-            val c: res[usize, DeflateError] = compress_into(?a, levels[li], ZLIB, ?corpus[0], CORPUS_LEN, ?packed[0], bound(CORPUS_LEN, ZLIB));
-            if (sel c.err) { ret 1; }
+            val res_compress_into: res[usize, DeflateError] = compress_into(?a, levels[li], ZLIB, ?corpus[0], CORPUS_LEN, ?packed[0], bound(CORPUS_LEN, ZLIB));
+            if (sel res_compress_into.err) { ret 1; }
 
-            val short: res[usize, DeflateError] = compress_into(?a, levels[li], ZLIB, ?corpus[0], CORPUS_LEN, ?packed[0], c.ok - 1);
-            if (!sel short.err)                     { ret 3; }
-            if (!sel short.err.full)                { ret 4; }
-            if (short.err.full.written != c.ok - 1) { ret 5; }
+            val res_short: res[usize, DeflateError] = compress_into(?a, levels[li], ZLIB, ?corpus[0], CORPUS_LEN, ?packed[0], res_compress_into.ok - 1);
+            if (!sel res_short.err)                                     { ret 3; }
+            if (!sel res_short.err.full)                                { ret 4; }
+            if (res_short.err.full.written != res_compress_into.ok - 1) { ret 5; }
             li = li + 1;
         }
         ret 0;
@@ -1481,38 +1481,38 @@ $if (capability.HOSTED) {
         var a: A.Allocator;
         page.make(?a);
 
-        val bad_level: res[Deflater, DeflateError] = init(?a, 10, RAW);
-        if (!sel bad_level.err)       { ret 1; }
-        if (!sel bad_level.err.level) { ret 1; }
-        val bad_frame: res[Deflater, DeflateError] = init(?a, 6, 3);
-        if (!sel bad_frame.err)           { ret 2; }
-        if (!sel bad_frame.err.container) { ret 2; }
+        val res_bad_level: res[Deflater, DeflateError] = init(?a, 10, RAW);
+        if (!sel res_bad_level.err)       { ret 1; }
+        if (!sel res_bad_level.err.level) { ret 1; }
+        val res_bad_frame: res[Deflater, DeflateError] = init(?a, 6, 3);
+        if (!sel res_bad_frame.err)           { ret 2; }
+        if (!sel res_bad_frame.err.container) { ret 2; }
 
-        val ri: res[Deflater, DeflateError] = init(?a, 6, GZIP);
-        if (sel ri.err) { ret 3; }
-        var z: Deflater = ri.ok;
+        val res_gzip_made: res[Deflater, DeflateError] = init(?a, 6, GZIP);
+        if (sel res_gzip_made.err) { ret 3; }
+        var z: Deflater = res_gzip_made.ok;
 
-        val f: res[I.Progress, DeflateError] = finish(?z, ?packed[0], 64);
-        if (sel f.err)             { ret 4; }
-        if (f.ok.status != I.DONE) { ret 4; }
-        val again: res[I.Progress, DeflateError] = finish(?z, ?packed[0], 64);
-        if (sel again.err)                                      { ret 5; }
-        if (again.ok.status != I.DONE || again.ok.written != 0) { ret 5; }
-        val late: res[I.Progress, DeflateError] = compress(?z, ?corpus[0], 1, ?packed[0], 64);
-        if (!sel late.err)          { ret 6; }
-        if (!sel late.err.finished) { ret 6; }
+        val res_finish: res[I.Progress, DeflateError] = finish(?z, ?packed[0], 64);
+        if (sel res_finish.err)             { ret 4; }
+        if (res_finish.ok.status != I.DONE) { ret 4; }
+        val res_again: res[I.Progress, DeflateError] = finish(?z, ?packed[0], 64);
+        if (sel res_again.err)                                          { ret 5; }
+        if (res_again.ok.status != I.DONE || res_again.ok.written != 0) { ret 5; }
+        val res_late: res[I.Progress, DeflateError] = compress(?z, ?corpus[0], 1, ?packed[0], 64);
+        if (!sel res_late.err)          { ret 6; }
+        if (!sel res_late.err.finished) { ret 6; }
 
         # reset starts a new stream that reproduces the first
-        val first: usize = f.ok.written;
+        val first: usize = res_finish.ok.written;
         reset(?z);
-        val f2: res[I.Progress, DeflateError] = finish(?z, ?chunked[0], 64);
-        if (sel f2.err)             { ret 7; }
-        if (f2.ok.written != first) { ret 7; }
+        val res_finish_chunked: res[I.Progress, DeflateError] = finish(?z, ?chunked[0], 64);
+        if (sel res_finish_chunked.err)             { ret 7; }
+        if (res_finish_chunked.ok.written != first) { ret 7; }
 
         dnit(?z);
-        val closed: res[I.Progress, DeflateError] = compress(?z, ?corpus[0], 1, ?packed[0], 64);
-        if (!sel closed.err)        { ret 8; }
-        if (!sel closed.err.closed) { ret 8; }
+        val res_closed: res[I.Progress, DeflateError] = compress(?z, ?corpus[0], 1, ?packed[0], 64);
+        if (!sel res_closed.err)        { ret 8; }
+        if (!sel res_closed.err.closed) { ret 8; }
         ret 0;
     }
 
@@ -1522,20 +1522,20 @@ $if (capability.HOSTED) {
         make_corpus(0, 50000);
         var ordinal: usize = 1;
         for (ordinal <= 16) {
-            var tracker: testing.Testing;
-            val made:    err[A.Error] = testing.make(?tracker);
-            if (sel made.err) { ret 1; }
+            var tracker:  testing.Testing;
+            val err_made: err[A.Error] = testing.make(?tracker);
+            if (sel err_made.err) { ret 1; }
             testing.fail_at_ordinal(?tracker, ordinal);
-            val r:        res[V.Vector[u8], DeflateError] = compress_alloc(testing.allocator_of(?tracker), 6, RAW, ?corpus[0], 50000);
-            var accepted: bool                            = false;
-            if (sel r.err) {
-                if (!sel r.err.alloc) {
+            val res_compress_alloc: res[V.Vector[u8], DeflateError] = compress_alloc(testing.allocator_of(?tracker), 6, RAW, ?corpus[0], 50000);
+            var accepted:           bool                            = false;
+            if (sel res_compress_alloc.err) {
+                if (!sel res_compress_alloc.err.alloc) {
                     testing.dnit(?tracker);
                     ret 2;
                 }
             }
-            if (sel r.ok) {
-                var out: V.Vector[u8] = r.ok;
+            if (sel res_compress_alloc.ok) {
+                var out: V.Vector[u8] = res_compress_alloc.ok;
                 accepted = true;
                 V.dnit[u8](?out);
             }

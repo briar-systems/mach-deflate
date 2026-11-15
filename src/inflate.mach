@@ -451,12 +451,12 @@ pub fun reset(z: *Inflater) {
 # a:   allocator used for the window and nothing else
 # ret: a ready decoder, or the allocator's refusal of the window
 pub fun init(a: *A.Allocator) res[Inflater, InflateError] {
-    val win: res[*u8, A.Error] = A.allocate[u8](a, WINDOW);
-    if (sel win.err) { ret res[Inflater, InflateError].err{InflateError.alloc{win.err}}; }
+    val res_win: res[*u8, A.Error] = A.allocate[u8](a, WINDOW);
+    if (sel res_win.err) { ret res[Inflater, InflateError].err{InflateError.alloc{res_win.err}}; }
 
     var z: Inflater;
     z.a   = a;
-    z.win = win.ok;
+    z.win = res_win.ok;
     reset(?z);
 
     ret res[Inflater, InflateError].ok{z};
@@ -472,8 +472,8 @@ pub fun init(a: *A.Allocator) res[Inflater, InflateError] {
 pub fun dnit(z: *Inflater) err[A.Error] {
     if (z.win == nil) { ret err[A.Error].ok{}; }
 
-    val freed: err[A.Error] = A.deallocate[u8](z.a, z.win, WINDOW);
-    if (sel freed.err) { ret freed; }
+    val err_freed: err[A.Error] = A.deallocate[u8](z.a, z.win, WINDOW);
+    if (sel err_freed.err) { ret err_freed; }
     z.win = nil;
     ret err[A.Error].ok{};
 }
@@ -842,11 +842,11 @@ fun drive(z: *Inflater, src: *u8, src_len: usize, dst: *u8, dst_len: usize) res[
     var out_off: usize = 0;
 
     for (!is_done(z)) {
-        val r: res[Progress, InflateError] = decompress(z, ?src[in_off], src_len - in_off,
+        val res_decompress: res[Progress, InflateError] = decompress(z, ?src[in_off], src_len - in_off,
             ?dst[out_off], dst_len - out_off);
-        if (sel r.err) { ret res[usize, InflateError].err{advance(r.err, in_off, out_off)}; }
+        if (sel res_decompress.err) { ret res[usize, InflateError].err{advance(res_decompress.err, in_off, out_off)}; }
 
-        val p: Progress = r.ok;
+        val p: Progress = res_decompress.ok;
         in_off  = in_off + p.consumed;
         out_off = out_off + p.written;
 
@@ -871,14 +871,14 @@ fun drive(z: *Inflater, src: *u8, src_len: usize, dst: *u8, dst_len: usize) res[
 # ret:     bytes written, or the failure; malformed, truncated and full carry
 #          the counts committed over the whole call
 pub fun decompress_into(a: *A.Allocator, src: *u8, src_len: usize, dst: *u8, dst_len: usize) res[usize, InflateError] {
-    val ri: res[Inflater, InflateError] = init(a);
-    if (sel ri.err) { ret res[usize, InflateError].err{ri.err}; }
+    val res_made: res[Inflater, InflateError] = init(a);
+    if (sel res_made.err) { ret res[usize, InflateError].err{res_made.err}; }
 
-    var z:   Inflater                 = ri.ok;
-    val out: res[usize, InflateError] = drive(?z, src, src_len, dst, dst_len);
+    var z:       Inflater                 = res_made.ok;
+    val res_out: res[usize, InflateError] = drive(?z, src, src_len, dst, dst_len);
     dnit(?z);
 
-    ret out;
+    ret res_out;
 }
 
 fun grow(z: *Inflater, out: *V.Vector[u8], src: *u8, src_len: usize) res[usize, InflateError] {
@@ -889,15 +889,15 @@ fun grow(z: *Inflater, out: *V.Vector[u8], src: *u8, src_len: usize) res[usize, 
             var next: usize = out.cap * 2;
             if (next < 4096) { next = 4096; }
 
-            val e: res[usize, A.Error] = V.ensure[u8](out, next);
-            if (sel e.err) { ret res[usize, InflateError].err{InflateError.alloc{e.err}}; }
+            val res_ensure: res[usize, A.Error] = V.ensure[u8](out, next);
+            if (sel res_ensure.err) { ret res[usize, InflateError].err{InflateError.alloc{res_ensure.err}}; }
         }
 
-        val r: res[Progress, InflateError] = decompress(z, ?src[in_off], src_len - in_off,
+        val res_decompress: res[Progress, InflateError] = decompress(z, ?src[in_off], src_len - in_off,
             ?out.data[out.len], out.cap - out.len);
-        if (sel r.err) { ret res[usize, InflateError].err{advance(r.err, in_off, out.len)}; }
+        if (sel res_decompress.err) { ret res[usize, InflateError].err{advance(res_decompress.err, in_off, out.len)}; }
 
-        val p: Progress = r.ok;
+        val p: Progress = res_decompress.ok;
         in_off  = in_off + p.consumed;
         out.len = out.len + p.written;
 
@@ -918,18 +918,18 @@ fun grow(z: *Inflater, out: *V.Vector[u8], src: *u8, src_len: usize) res[usize, 
 #          or the failure; on failure the vector is already released, so the
 #          committed counts describe output that no longer exists
 pub fun decompress_alloc(a: *A.Allocator, src: *u8, src_len: usize) res[V.Vector[u8], InflateError] {
-    val ri: res[Inflater, InflateError] = init(a);
-    if (sel ri.err) { ret res[V.Vector[u8], InflateError].err{ri.err}; }
+    val res_made: res[Inflater, InflateError] = init(a);
+    if (sel res_made.err) { ret res[V.Vector[u8], InflateError].err{res_made.err}; }
 
-    var z:   Inflater     = ri.ok;
+    var z:   Inflater     = res_made.ok;
     var out: V.Vector[u8] = V.init[u8](a);
 
-    val grown: res[usize, InflateError] = grow(?z, ?out, src, src_len);
+    val res_grown: res[usize, InflateError] = grow(?z, ?out, src, src_len);
     dnit(?z);
 
-    if (sel grown.err) {
+    if (sel res_grown.err) {
         V.dnit[u8](?out);
-        ret res[V.Vector[u8], InflateError].err{grown.err};
+        ret res[V.Vector[u8], InflateError].err{res_grown.err};
     }
 
     ret res[V.Vector[u8], InflateError].ok{out};
@@ -1144,10 +1144,10 @@ $if (capability.HOSTED) {
         var a: A.Allocator;
         page.make(?a);
 
-        val r: res[usize, InflateError] = decompress_into(?a, comp, comp_len, ?obuf[0], 4096);
-        if (sel r.err) { ret 1; }
+        val res_decompress_into: res[usize, InflateError] = decompress_into(?a, comp, comp_len, ?obuf[0], 4096);
+        if (sel res_decompress_into.err) { ret 1; }
 
-        val n: usize = r.ok;
+        val n: usize = res_decompress_into.ok;
         if (n != orig_len) { ret 2; }
 
         var i: usize = 0;
@@ -1176,21 +1176,21 @@ $if (capability.HOSTED) {
         var a: A.Allocator;
         page.make(?a);
 
-        val whole: res[usize, InflateError] = decompress_into(?a, ?C_FIXED[0], 10, ?obuf[0], 23);
-        if (sel whole.err)  { ret 5; }
-        if (whole.ok != 23) { ret 6; }
+        val res_whole: res[usize, InflateError] = decompress_into(?a, ?C_FIXED[0], 10, ?obuf[0], 23);
+        if (sel res_whole.err)  { ret 5; }
+        if (res_whole.ok != 23) { ret 6; }
 
-        val ri: res[Inflater, InflateError] = init(?a);
-        if (sel ri.err) { ret 1; }
-        var z: Inflater = ri.ok;
+        val res_made: res[Inflater, InflateError] = init(?a);
+        if (sel res_made.err) { ret 1; }
+        var z: Inflater = res_made.ok;
 
-        val r: res[Progress, InflateError] = decompress(?z, ?C_FIXED[0], 10, ?obuf[0], 23);
-        if (sel r.err) {
+        val res_decompress: res[Progress, InflateError] = decompress(?z, ?C_FIXED[0], 10, ?obuf[0], 23);
+        if (sel res_decompress.err) {
             dnit(?z);
             ret 2;
         }
 
-        val p:    Progress = r.ok;
+        val p:    Progress = res_decompress.ok;
         val done: bool     = is_done(?z);
         dnit(?z);
 
@@ -1356,10 +1356,10 @@ $if (capability.HOSTED) {
         var a: A.Allocator;
         page.make(?a);
 
-        val r: res[usize, InflateError] = decompress_into(?a, comp, comp_len, ?obuf[0], 4096);
-        if (sel r.err) { ret 1; }
+        val res_decompress_into: res[usize, InflateError] = decompress_into(?a, comp, comp_len, ?obuf[0], 4096);
+        if (sel res_decompress_into.err) { ret 1; }
 
-        val n: usize = r.ok;
+        val n: usize = res_decompress_into.ok;
         if (n != orig_len) { ret 2; }
 
         var i: usize = 0;
@@ -1376,10 +1376,10 @@ $if (capability.HOSTED) {
         var a: A.Allocator;
         page.make(?a);
 
-        val r: res[V.Vector[u8], InflateError] = decompress_alloc(?a, comp, comp_len);
-        if (sel r.err) { ret 1; }
+        val res_decompress_alloc: res[V.Vector[u8], InflateError] = decompress_alloc(?a, comp, comp_len);
+        if (sel res_decompress_alloc.err) { ret 1; }
 
-        var v: V.Vector[u8] = r.ok;
+        var v: V.Vector[u8] = res_decompress_alloc.ok;
         if (v.len != orig_len) {
             V.dnit[u8](?v);
             ret 2;
@@ -1405,9 +1405,9 @@ $if (capability.HOSTED) {
         var a: A.Allocator;
         page.make(?a);
 
-        val ri: res[Inflater, InflateError] = init(?a);
-        if (sel ri.err) { ret 1; }
-        var z: Inflater = ri.ok;
+        val res_made: res[Inflater, InflateError] = init(?a);
+        if (sel res_made.err) { ret 1; }
+        var z: Inflater = res_made.ok;
 
         var in_off:  usize = 0;
         var out_off: usize = 0;
@@ -1422,13 +1422,13 @@ $if (capability.HOSTED) {
             var room: usize = out_chunk;
             if (out_off + room > 4096) { room = 4096 - out_off; }
 
-            val r: res[Progress, InflateError] = decompress(?z, ?comp[in_off], feed, ?obuf[out_off], room);
-            if (sel r.err) {
+            val res_decompress: res[Progress, InflateError] = decompress(?z, ?comp[in_off], feed, ?obuf[out_off], room);
+            if (sel res_decompress.err) {
                 dnit(?z);
                 ret 2;
             }
 
-            val p: Progress = r.ok;
+            val p: Progress = res_decompress.ok;
             in_off  = in_off + p.consumed;
             out_off = out_off + p.written;
 
@@ -1438,9 +1438,9 @@ $if (capability.HOSTED) {
             }
         }
 
-        val f: err[InflateError] = finish(?z);
+        val err_finish: err[InflateError] = finish(?z);
         dnit(?z);
-        if (sel f.err)           { ret 4; }
+        if (sel err_finish.err)  { ret 4; }
         if (in_off != comp_len)  { ret 5; }
         if (out_off != orig_len) { ret 6; }
 
@@ -1485,10 +1485,10 @@ $if (capability.HOSTED) {
 
         var a: A.Allocator;
         page.make(?a);
-        val r: res[V.Vector[u8], InflateError] = decompress_alloc(?a, ?max_distance_comp[0], 32778);
-        if (sel r.err) { ret 1; }
+        val res_decompress_alloc: res[V.Vector[u8], InflateError] = decompress_alloc(?a, ?max_distance_comp[0], 32778);
+        if (sel res_decompress_alloc.err) { ret 1; }
 
-        var v: V.Vector[u8] = r.ok;
+        var v: V.Vector[u8] = res_decompress_alloc.ok;
         if (v.len != WINDOW + 3) {
             V.dnit[u8](?v);
             ret 2;
@@ -1605,10 +1605,10 @@ $if (capability.HOSTED) {
         var a: A.Allocator;
         page.make(?a);
 
-        val r: res[usize, InflateError] = decompress_into(?a, comp, comp_len, ?obuf[0], 4096);
-        if (!sel r.err)                                               { ret 1; }
-        if (!sel r.err.malformed)                                     { ret 2; }
-        if (defect_code(r.err.malformed.defect) != defect_code(want)) { ret 3; }
+        val res_decompress_into: res[usize, InflateError] = decompress_into(?a, comp, comp_len, ?obuf[0], 4096);
+        if (!sel res_decompress_into.err)                                               { ret 1; }
+        if (!sel res_decompress_into.err.malformed)                                     { ret 2; }
+        if (defect_code(res_decompress_into.err.malformed.defect) != defect_code(want)) { ret 3; }
         ret 0;
     }
 
@@ -1619,10 +1619,10 @@ $if (capability.HOSTED) {
         var a: A.Allocator;
         page.make(?a);
 
-        val r: res[usize, InflateError] = decompress_into(?a, comp, comp_len, ?obuf[0], 4096);
-        if (!sel r.err)                           { ret 1; }
-        if (!sel r.err.truncated)                 { ret 2; }
-        if (r.err.truncated.consumed != comp_len) { ret 3; }
+        val res_decompress_into: res[usize, InflateError] = decompress_into(?a, comp, comp_len, ?obuf[0], 4096);
+        if (!sel res_decompress_into.err)                           { ret 1; }
+        if (!sel res_decompress_into.err.truncated)                 { ret 2; }
+        if (res_decompress_into.err.truncated.consumed != comp_len) { ret 3; }
         ret 0;
     }
 
@@ -1653,8 +1653,8 @@ $if (capability.HOSTED) {
 
         var n: usize = 0;
         for (n < 402) {
-            val r: res[usize, InflateError] = decompress_into(?a, ?C_DYNAMIC[0], n, ?obuf[0], 4096);
-            if (!sel r.err) { ret 1; }
+            val res_decompress_into: res[usize, InflateError] = decompress_into(?a, ?C_DYNAMIC[0], n, ?obuf[0], 4096);
+            if (!sel res_decompress_into.err) { ret 1; }
             n = n + 1;
         }
         ret 0;
@@ -1677,9 +1677,9 @@ $if (capability.HOSTED) {
 
                 # a flipped bit may still form a valid stream, so either outcome is
                 # allowed; what matters is that the call returns and stays in bounds
-                val r: res[usize, InflateError] = decompress_into(?a, ?fuzz_buf[0], 402, ?obuf[0], 4096);
-                if (sel r.ok) {
-                    if (r.ok > 4096) { ret 1; }
+                val res_decompress_into: res[usize, InflateError] = decompress_into(?a, ?fuzz_buf[0], 402, ?obuf[0], 4096);
+                if (sel res_decompress_into.ok) {
+                    if (res_decompress_into.ok > 4096) { ret 1; }
                 }
 
                 b = b + 1;
@@ -1694,24 +1694,24 @@ $if (capability.HOSTED) {
     test inflate__allocation_refusal_is_alloc_and_holds_nothing {
         var ordinal: usize = 1;
         for (ordinal <= 8) {
-            var tracker: testing.Testing;
-            val made:    err[A.Error] = testing.make(?tracker);
-            if (sel made.err) { ret 1; }
+            var tracker:  testing.Testing;
+            val err_made: err[A.Error] = testing.make(?tracker);
+            if (sel err_made.err) { ret 1; }
             testing.fail_at_ordinal(?tracker, ordinal);
-            val r:        res[V.Vector[u8], InflateError] = decompress_alloc(testing.allocator_of(?tracker), ?C_DYNAMIC[0], 402);
-            var accepted: bool                            = false;
-            if (sel r.err) {
-                if (!sel r.err.alloc) {
+            val res_decompress_alloc: res[V.Vector[u8], InflateError] = decompress_alloc(testing.allocator_of(?tracker), ?C_DYNAMIC[0], 402);
+            var accepted:             bool                            = false;
+            if (sel res_decompress_alloc.err) {
+                if (!sel res_decompress_alloc.err.alloc) {
                     testing.dnit(?tracker);
                     ret 2;
                 }
-                if (!sel r.err.alloc.exhausted) {
+                if (!sel res_decompress_alloc.err.alloc.exhausted) {
                     testing.dnit(?tracker);
                     ret 3;
                 }
             }
-            if (sel r.ok) {
-                var out: V.Vector[u8] = r.ok;
+            if (sel res_decompress_alloc.ok) {
+                var out: V.Vector[u8] = res_decompress_alloc.ok;
                 accepted = out.len == 2253;
                 V.dnit[u8](?out);
             }
@@ -1736,17 +1736,17 @@ $if (capability.HOSTED) {
         var a: A.Allocator;
         page.make(?a);
 
-        val small: res[usize, InflateError] = decompress_into(?a, ?C_DYNAMIC[0], 402, ?obuf[0], 100);
-        if (!sel small.err)                                                { ret 1; }
-        if (!sel small.err.full)                                           { ret 2; }
-        if (small.err.full.written != 100)                                 { ret 3; }
-        if (small.err.full.consumed == 0 || small.err.full.consumed > 402) { ret 4; }
+        val res_small: res[usize, InflateError] = decompress_into(?a, ?C_DYNAMIC[0], 402, ?obuf[0], 100);
+        if (!sel res_small.err)                                                    { ret 1; }
+        if (!sel res_small.err.full)                                               { ret 2; }
+        if (res_small.err.full.written != 100)                                     { ret 3; }
+        if (res_small.err.full.consumed == 0 || res_small.err.full.consumed > 402) { ret 4; }
 
-        val cut: res[usize, InflateError] = decompress_into(?a, ?C_DYNAMIC[0], 200, ?obuf[0], 4096);
-        if (!sel cut.err)                                                        { ret 5; }
-        if (!sel cut.err.truncated)                                              { ret 6; }
-        if (cut.err.truncated.consumed != 200)                                   { ret 7; }
-        if (cut.err.truncated.written == 0 || cut.err.truncated.written >= 2253) { ret 8; }
+        val res_cut: res[usize, InflateError] = decompress_into(?a, ?C_DYNAMIC[0], 200, ?obuf[0], 4096);
+        if (!sel res_cut.err)                                                            { ret 5; }
+        if (!sel res_cut.err.truncated)                                                  { ret 6; }
+        if (res_cut.err.truncated.consumed != 200)                                       { ret 7; }
+        if (res_cut.err.truncated.written == 0 || res_cut.err.truncated.written >= 2253) { ret 8; }
         ret 0;
     }
 
@@ -1756,22 +1756,22 @@ $if (capability.HOSTED) {
         var a: A.Allocator;
         page.make(?a);
 
-        val ri: res[Inflater, InflateError] = init(?a);
-        if (sel ri.err) { ret 1; }
-        var z: Inflater = ri.ok;
+        val res_made: res[Inflater, InflateError] = init(?a);
+        if (sel res_made.err) { ret 1; }
+        var z: Inflater = res_made.ok;
 
-        val first: err[A.Error] = dnit(?z);
-        if (sel first.err) { ret 2; }
-        val second: err[A.Error] = dnit(?z);
-        if (sel second.err) { ret 3; }
+        val err_first: err[A.Error] = dnit(?z);
+        if (sel err_first.err) { ret 2; }
+        val err_second: err[A.Error] = dnit(?z);
+        if (sel err_second.err) { ret 3; }
 
-        val fed: res[Progress, InflateError] = decompress(?z, ?C_FIXED[0], 10, ?obuf[0], 23);
-        if (!sel fed.err)        { ret 4; }
-        if (!sel fed.err.closed) { ret 5; }
+        val res_fed: res[Progress, InflateError] = decompress(?z, ?C_FIXED[0], 10, ?obuf[0], 23);
+        if (!sel res_fed.err)        { ret 4; }
+        if (!sel res_fed.err.closed) { ret 5; }
 
-        val f: err[InflateError] = finish(?z);
-        if (!sel f.err)        { ret 6; }
-        if (!sel f.err.closed) { ret 7; }
+        val err_finish: err[InflateError] = finish(?z);
+        if (!sel err_finish.err)        { ret 6; }
+        if (!sel err_finish.err.closed) { ret 7; }
         ret 0;
     }
 }
