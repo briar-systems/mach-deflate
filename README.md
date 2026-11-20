@@ -17,13 +17,13 @@ git = "https://github.com/briar-systems/mach-deflate"
 ref = "branch/dev"
 ```
 
-Then bind the library in a source file:
+Then import each module you use by its source path in the package, such as:
 
 ```mach
-use deflate;
+use deflate.inflate;
 ```
 
-The library forwards these modules:
+The package has these modules:
 
 - `deflate.deflate`: DEFLATE compression (RFC 1951)
 - `deflate.inflate`: DEFLATE decompression (RFC 1951)
